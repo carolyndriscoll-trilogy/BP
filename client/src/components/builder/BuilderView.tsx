@@ -7,12 +7,12 @@ import { KnowledgeTreePhase } from './KnowledgeTreePhase';
 import { PlaceholderPhase } from './PlaceholderPhase';
 
 const PHASES = [
-  { id: 1, label: 'You & Your Mission' },
-  { id: 2, label: 'Your Experts' },
-  { id: 3, label: 'Knowledge Tree' },
-  { id: 4, label: 'Connections' },
-  { id: 5, label: 'Blueprints' },
-  { id: 6, label: 'Your Stance' },
+  { id: 1, label: 'You & Your Mission', dok: null },
+  { id: 2, label: 'Your Experts', dok: null },
+  { id: 3, label: 'Knowledge Tree', dok: 'DOK1 + DOK2' },
+  { id: 4, label: 'Connections', dok: 'DOK3' },
+  { id: 5, label: 'Blueprints', dok: null },
+  { id: 6, label: 'Your Stance', dok: 'DOK4' },
 ] as const;
 
 interface BuilderViewProps {
@@ -59,7 +59,12 @@ export function BuilderView({ data, slug }: BuilderViewProps) {
                   }`}
                 >
                   <span className="text-[11px] font-bold w-5 text-center shrink-0">{phase.id}</span>
-                  <span className="flex-1">{phase.label}</span>
+                  <span className="flex-1">
+                    {phase.label}
+                    {phase.dok && (
+                      <span className="text-[10px] text-muted-foreground/60 ml-1 font-normal">({phase.dok})</span>
+                    )}
+                  </span>
                 </button>
               </li>
             );
