@@ -18,10 +18,17 @@ import { storage } from '../storage';
 import { generateImagePrompt } from './imagePromptGenerator';
 import { uploadBuffer, isS3Configured } from '../utils/s3';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client (optional — image generation won't work without OPENAI_API_KEY)
+let _openai: OpenAI | null = null;
+function getOpenAIClient(): OpenAI {
+  if (!_openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is required for image generation');
+    }
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 // Cache the style guideline content
 let styleGuidelineCache: string | null = null;
@@ -108,7 +115,7 @@ ${styleGuideline}`;
   console.log(`  n: ${apiParams.n}`);
   console.log(`  prompt: (${apiParams.prompt.length} chars)`);
 
-  const response = await openai.images.generate(apiParams);
+  const response = await getOpenAIClient().images.generate(apiParams);
 
   const imageBase64 = response.data?.[0]?.b64_json;
 

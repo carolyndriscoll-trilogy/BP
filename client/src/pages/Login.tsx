@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,12 @@ import { Card } from "@/components/ui/card";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Get redirect URL from query params
   const searchParams = new URLSearchParams(window.location.search);
@@ -15,6 +22,40 @@ export default function Login() {
       provider: "google",
       callbackURL: redirectTo,
     });
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        const { error } = await authClient.signUp.email({
+          email,
+          password,
+          name: name || email.split("@")[0],
+        });
+        if (error) {
+          setError(error.message || "Sign up failed");
+          return;
+        }
+      } else {
+        const { error } = await authClient.signIn.email({
+          email,
+          password,
+        });
+        if (error) {
+          setError(error.message || "Sign in failed");
+          return;
+        }
+      }
+      setLocation(redirectTo);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check if already logged in
@@ -71,7 +112,7 @@ export default function Login() {
 
       {/* Right side - Login form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <Card className="w-full max-w-md p-8 space-y-8">
+        <Card className="w-full max-w-md p-8 space-y-6">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground">DOK1 Grader</h1>
@@ -82,37 +123,82 @@ export default function Login() {
 
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-semibold text-foreground">
-              Welcome back
+              {isSignUp ? "Create account" : "Welcome back"}
             </h2>
             <p className="text-muted-foreground">
-              Sign in to access your BrainLifts
+              {isSignUp ? "Sign up to get started" : "Sign in to access your BrainLifts"}
             </p>
           </div>
 
-          <div className="space-y-4">
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {isSignUp && (
+              <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              className="w-full h-12 px-4 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
+
             <Button
-              onClick={handleGoogleSignIn}
-              disabled={isPending}
+              type="submit"
+              disabled={loading || isPending}
               className="w-full h-12 text-base font-medium"
-              variant="outline"
             >
-              <GoogleIcon className="mr-3 h-5 w-5" />
-              Continue with Google
+              {loading ? "..." : isSignUp ? "Sign up" : "Sign in"}
             </Button>
-          </div>
+          </form>
 
           <div className="text-center text-sm text-muted-foreground">
-            <p>
-              By continuing, you agree to our{" "}
-              <span className="underline cursor-pointer hover:text-foreground">
-                Terms of Service
-              </span>{" "}
-              and{" "}
-              <span className="underline cursor-pointer hover:text-foreground">
-                Privacy Policy
-              </span>
-            </p>
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
+              className="underline hover:text-foreground"
+            >
+              {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+            </button>
           </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleGoogleSignIn}
+            disabled={isPending}
+            className="w-full h-12 text-base font-medium"
+            variant="outline"
+          >
+            <GoogleIcon className="mr-3 h-5 w-5" />
+            Continue with Google
+          </Button>
         </Card>
       </div>
     </div>

@@ -10,15 +10,23 @@ export const auth = betterAuth({
   trustedOrigins: [
     ...(process.env.TRUSTED_ORIGINS || "").split(",").filter(Boolean),
     process.env.BETTER_AUTH_URL || "http://localhost:5000",
+    "http://localhost:3001",
   ],
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
+  emailAndPassword: {
+    enabled: true,
+  },
   socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    },
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : {}),
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
