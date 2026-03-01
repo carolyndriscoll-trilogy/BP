@@ -5,8 +5,8 @@ import {
   buildExpertDiagnosticsPrompt,
   type ExpertDiagnosticsLLMResponse,
 } from '../prompts/expert-diagnostics';
+import { callOpenRouterModel } from '../llm-utils';
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PRIMARY_MODEL = 'anthropic/claude-sonnet-4.5';
 const FALLBACK_MODEL = 'google/gemini-2.0-flash-001';
 
@@ -182,35 +182,13 @@ async function callModel(
 ): Promise<ExpertDiagnosticsLLMResponse | null> {
   console.log(`[Expert Diagnostics] Calling model: ${model}`);
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      max_tokens: 1500,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
+  const raw = await callOpenRouterModel(model, null, prompt, 1500, 0);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.log(`[Expert Diagnostics] API error ${response.status}: ${errorText}`);
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  let content = data.choices?.[0]?.message?.content || '';
-
-  console.log(`[Expert Diagnostics] Raw LLM response:`, content);
+  console.log(`[Expert Diagnostics] Raw LLM response:`, raw);
 
   // Extract JSON from response
-  content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  const clean = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     console.log(`[Expert Diagnostics] No JSON found in response`);
     throw new Error('No JSON found in response');

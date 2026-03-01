@@ -15,7 +15,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
  */
 export async function callOpenRouterModel(
   model: string,
-  systemPrompt: string,
+  systemPrompt: string | null,
   userPrompt: string,
   maxTokens: number,
   temperature: number = 0.1
@@ -35,7 +35,7 @@ export async function callOpenRouterModel(
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
           { role: 'user', content: userPrompt },
         ],
         temperature,

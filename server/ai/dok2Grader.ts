@@ -13,9 +13,7 @@ import { z } from 'zod';
 import { LLM_MODELS, type LLMModel, type DOK2FailReason, DOK2_FAIL_REASON } from '@shared/schema';
 import { fetchEvidenceForFact } from './evidenceFetcher';
 import { DOK2_GRADING_SYSTEM_PROMPT, DOK2_GRADING_USER_PROMPT } from '../prompts/dok2-grading';
-import pRetry from 'p-retry';
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+import { callOpenRouterModel } from './llm-utils';
 
 // Zod schema for validating LLM response
 const dok2GradeSchema = z.object({
@@ -48,100 +46,54 @@ async function callGradingModel(
   systemPrompt: string,
   userPrompt: string
 ): Promise<{ displayTitle: string | null; score: number; diagnosis: string; feedback: string; failReason: DOK2FailReason | null }> {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('OpenRouter API key not configured');
+  const raw = await callOpenRouterModel(model, systemPrompt, userPrompt, 1500, 0.1);
+
+  // Remove markdown code blocks if present
+  let cleanContent = raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // Extract JSON from response
+  const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Could not find JSON in response');
   }
 
-  const run = async () => {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://replit.com',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.1,
-        max_tokens: 1500,
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (parseErr) {
+    // Try to extract fields manually if JSON parse fails
+    const scoreMatch = cleanContent.match(/"score"\s*:\s*(\d)/);
+    const diagnosisMatch = cleanContent.match(/"diagnosis"\s*:\s*"([^"]+)"/);
+    const feedbackMatch = cleanContent.match(/"feedback"\s*:\s*"([^"]+)"/);
+    const failReasonMatch = cleanContent.match(/"failReason"\s*:\s*(?:null|"([^"]+)")/);
+    const displayTitleMatch = cleanContent.match(/"displayTitle"\s*:\s*"([^"]+)"/);
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        console.error(`[DOK2-Grade] 429 rate limit from ${model}`);
-        throw new Error(`RATE_LIMIT: ${model}`);
-      }
-      throw new Error(`API error: ${response.status}`);
+    if (scoreMatch) {
+      parsed = {
+        displayTitle: displayTitleMatch ? displayTitleMatch[1] : null,
+        score: parseInt(scoreMatch[1]),
+        diagnosis: diagnosisMatch ? diagnosisMatch[1] : 'Unable to parse diagnosis',
+        feedback: feedbackMatch ? feedbackMatch[1] : 'Unable to parse feedback',
+        failReason: failReasonMatch && failReasonMatch[1] ? failReasonMatch[1] : null,
+      };
+    } else {
+      throw new Error('Could not parse JSON response');
     }
+  }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+  // Validate with zod
+  const validated = dok2GradeSchema.parse(parsed);
 
-    if (!content) {
-      throw new Error('No response content');
-    }
-
-    // Remove markdown code blocks if present
-    let cleanContent = content
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim();
-
-    // Extract JSON from response
-    const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Could not find JSON in response');
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      // Try to extract fields manually if JSON parse fails
-      const scoreMatch = cleanContent.match(/"score"\s*:\s*(\d)/);
-      const diagnosisMatch = cleanContent.match(/"diagnosis"\s*:\s*"([^"]+)"/);
-      const feedbackMatch = cleanContent.match(/"feedback"\s*:\s*"([^"]+)"/);
-      const failReasonMatch = cleanContent.match(/"failReason"\s*:\s*(?:null|"([^"]+)")/);
-      const displayTitleMatch = cleanContent.match(/"displayTitle"\s*:\s*"([^"]+)"/);
-
-      if (scoreMatch) {
-        parsed = {
-          displayTitle: displayTitleMatch ? displayTitleMatch[1] : null,
-          score: parseInt(scoreMatch[1]),
-          diagnosis: diagnosisMatch ? diagnosisMatch[1] : 'Unable to parse diagnosis',
-          feedback: feedbackMatch ? feedbackMatch[1] : 'Unable to parse feedback',
-          failReason: failReasonMatch && failReasonMatch[1] ? failReasonMatch[1] : null,
-        };
-      } else {
-        throw new Error('Could not parse JSON response');
-      }
-    }
-
-    // Validate with zod
-    const validated = dok2GradeSchema.parse(parsed);
-
-    return {
-      displayTitle: validated.displayTitle || null,
-      score: validated.score,
-      diagnosis: validated.diagnosis,
-      feedback: validated.feedback,
-      failReason: validated.failReason as DOK2FailReason | null,
-    };
+  return {
+    displayTitle: validated.displayTitle || null,
+    score: validated.score,
+    diagnosis: validated.diagnosis,
+    feedback: validated.feedback,
+    failReason: validated.failReason as DOK2FailReason | null,
   };
-
-  // Retry with exponential backoff
-  return pRetry(run, {
-    retries: 2,
-    onFailedAttempt: error => {
-      console.log(`[DOK2-Grade] Model ${model} attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`);
-    }
-  });
 }
 
 /**

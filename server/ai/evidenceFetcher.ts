@@ -1,3 +1,5 @@
+import { callOpenRouterModel } from './llm-utils';
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 export interface EvidenceResult {
@@ -85,34 +87,7 @@ async function fetchWebContent(url: string): Promise<{ content: string | null; e
 }
 
 async function callEvidenceSearchModel(model: string, prompt: string): Promise<string | null> {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://replit.com',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 1000,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      console.error(`[RATE-LIMIT] 429 from ${model} - too many requests`);
-      throw new Error(`RATE_LIMIT: ${model}`);
-    }
-    throw new Error(`API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Empty response');
-  return content;
+  return callOpenRouterModel(model, null, prompt, 1000, 0.1);
 }
 
 async function searchForEvidence(

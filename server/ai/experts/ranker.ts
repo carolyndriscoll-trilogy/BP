@@ -3,6 +3,7 @@ import { expertExtractionSchema } from './types';
 import { extractExpertsFromDocument } from './parsers';
 import { extractExpertsFromFactSources } from './extractors';
 import { buildExpertProfiles, computeImpactScore } from './profiler';
+import { callOpenRouterModel } from '../llm-utils';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = 'anthropic/claude-sonnet-4';
@@ -83,32 +84,11 @@ Example: ["John Smith", "0", "Jane Doe", "Focus"] → [true, false, true, false]
     model: string
   ): Promise<boolean[]> {
     const names = batch.map(e => e.name);
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: cleanupPrompt },
-          { role: 'user', content: JSON.stringify(names) },
-        ],
-        temperature: 0,
-        max_tokens: 200,
-      }),
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
-
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content || '';
+    const content = await callOpenRouterModel(model, cleanupPrompt, JSON.stringify(names), 200, 0);
 
     // Extract JSON array from response
-    content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    const clean = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const jsonMatch = clean.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error('No JSON array found');
 
     const result = JSON.parse(jsonMatch[0]);
@@ -245,38 +225,7 @@ ${input.originalContent?.slice(0, 10000)}`}
 Assign differentiated scores (1-10) based on the citation counts or relevance in the text. ${allExperts.length > 0 ? 'No two experts with different citation counts should have the same score.' : 'Identify the top 5-10 experts mentioned in the text if none were explicitly listed.'}`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://replit.com',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.1,
-        max_tokens: 2000,
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenRouter API error:', errorText);
-      return [];
-    }
-
-    const data = await response.json();
-    let content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error('No content in response');
-      return [];
-    }
+    let content = await callOpenRouterModel(MODEL, SYSTEM_PROMPT, userPrompt, 2000, 0.1);
 
     content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
