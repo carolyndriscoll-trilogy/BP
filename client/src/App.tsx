@@ -11,7 +11,6 @@ const Home = lazy(() => import("@/pages/Home"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Login = lazy(() => import("@/pages/Login"));
 const NotFound = lazy(() => import("@/pages/not-found"));
-const DevImportAgentTest = lazy(() => import("@/pages/DevImportAgentTest"));
 
 // Loading fallback
 function PageLoader() {
@@ -26,11 +25,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/dev/import-agent">
-        <ProtectedRoute>
-          <DevImportAgentTest />
-        </ProtectedRoute>
-      </Route>
       <Route path="/">
         <ProtectedRoute>
           <Home />

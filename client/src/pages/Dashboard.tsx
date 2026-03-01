@@ -29,7 +29,6 @@ import { DOK4SubmitModal } from '@/components/DOK4SubmitModal';
 import { DOK3LinkingUI } from '@/components/DOK3LinkingUI';
 import { LearningStreamTab } from '@/components/LearningStreamTab';
 import { SavedItemsPage, GradedItemsPage } from '@/components/learning-stream';
-import { ImportAgentModal } from '@/components/import-agent/ImportAgentModal';
 import { usePDFExport } from '@/hooks/usePDFExport';
 import { useShareToken } from '@/hooks/useShareToken';
 import { useDOK3Insights } from '@/hooks/useDOK3Insights';
