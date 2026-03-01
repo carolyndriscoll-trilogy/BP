@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lightbulb, RefreshCw, Loader2, ChevronDown, ChevronUp, Info, AlertTriangle, Plus } from 'lucide-react';
+import { Lightbulb, RefreshCw, Loader2, ChevronDown, ChevronUp, Info, AlertTriangle } from 'lucide-react';
 import { PiFootprintsFill } from 'react-icons/pi';
 import type { DOK4SubmissionWithLinks } from '@/hooks/useDOK4';
 import type { DOK4GradingSSEEvent } from '@/hooks/useDOK4GradingEvents';
 import { tokens, getScoreChipColors } from '@/lib/colors';
-import { TactileButton } from '@/components/ui/tactile-button';
 
 // ─── Criteria Metadata ─────────────────────────────────────────────────────────
 
@@ -62,7 +61,6 @@ interface DOK4TabProps {
   highQualityCount: number;
   needsWorkCount: number;
   latestEvent: DOK4GradingSSEEvent | null;
-  onNewSubmission: () => void;
 }
 
 function getGradeLabel(score: number | null): string {
@@ -110,7 +108,6 @@ export function DOK4Tab({
   highQualityCount,
   needsWorkCount,
   latestEvent,
-  onNewSubmission,
 }: DOK4TabProps) {
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
   const [sortMode, setSortMode] = useState<SortMode>('score');
@@ -188,18 +185,10 @@ export function DOK4Tab({
             <h3 className="font-serif text-[24px] text-foreground m-0 mb-4">
               No SPOVs Yet
             </h3>
-            <p className="text-[14px] text-muted-light m-0 max-w-md leading-relaxed mb-10">
-              DOK4 Spiky Points of View are original, defensible positions that build on your DOK3 frameworks
-              and are supported by evidence from multiple DOK2 sources. Submit your first SPOV to begin.
+            <p className="text-[14px] text-muted-light m-0 max-w-md leading-relaxed">
+              DOK4 Spiky Points of View are automatically extracted from your BrainLift.
+              Mark a section as DOK4 in your WorkFlowy to see SPOVs here.
             </p>
-            <TactileButton
-              variant="raised"
-              onClick={onNewSubmission}
-              className="flex items-center gap-3 px-8 py-4 text-[14px]"
-            >
-              <Plus size={18} />
-              Submit SPOV
-            </TactileButton>
           </div>
         </div>
       </div>
@@ -210,21 +199,9 @@ export function DOK4Tab({
     <div className="max-w-[1200px] mx-auto">
       {/* Page Header */}
       <div className="flex flex-col gap-4 mb-6 pb-4">
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <h2 className="text-[30px] font-bold text-foreground tracking-tight leading-[1.1] m-0">
-              DOK4 Spiky Points of View
-            </h2>
-          </div>
-          <TactileButton
-            variant="raised"
-            onClick={onNewSubmission}
-            className="flex items-center gap-2 px-5 py-3 text-[13px] shrink-0"
-          >
-            <Plus size={16} />
-            New SPOV
-          </TactileButton>
-        </div>
+        <h2 className="text-[30px] font-bold text-foreground tracking-tight leading-[1.1] m-0">
+          DOK4 Spiky Points of View
+        </h2>
         <p className="text-[15px] text-muted-light m-0 max-w-2xl font-serif italic">
           Your original, defensible positions. Grades reflect intellectual spikiness, defensibility, and cognitive ownership.
         </p>

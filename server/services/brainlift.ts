@@ -564,6 +564,62 @@ export async function saveBrainliftFromAI(
         });
       }
 
+      // Save DOK4 SPOVs if present (extracted from hierarchy)
+      if (data.dok4SPOVs && data.dok4SPOVs.length > 0) {
+        console.log(`[Auto-Grade] Processing ${data.dok4SPOVs.length} DOK4 SPOVs from hierarchy...`);
+
+        // Get saved DOK3 insight IDs and DOK2 summary IDs for linking
+        const savedDOK3 = await storage.getDOK3Insights(brainlift.id, []);
+        const savedDOK2 = await storage.getDOK2Summaries(brainlift.id);
+        const dok3InsightIds = savedDOK3.map(i => i.id);
+        const dok2SummaryIds = savedDOK2.map(s => s.id);
+
+        if (dok3InsightIds.length >= 1 && dok2SummaryIds.length >= 2) {
+          const primaryDok3Id = dok3InsightIds[0]; // First DOK3 as default primary
+          const primaryDok3Text = savedDOK3[0].text;
+          const brainliftPurpose = data.description || data.title;
+
+          const { validateDOK4POV } = await import('../ai/dok4PovValidator');
+
+          for (const spov of data.dok4SPOVs) {
+            try {
+              // Create submission
+              const { id: submissionId } = await storage.createDOK4Submission(brainlift.id, spov.text);
+
+              // Link to all DOK3 insights and DOK2 summaries
+              await storage.linkDOK4Submission(submissionId, brainlift.id, {
+                dok3InsightIds,
+                primaryDok3Id,
+                dok2SummaryIds,
+              });
+
+              // Validate the POV
+              const validationResult = await validateDOK4POV(
+                spov.text,
+                primaryDok3Text,
+                null, // Framework name not available yet (DOK3 not graded)
+                brainliftPurpose,
+              );
+
+              // Save validation result
+              await storage.saveDOK4ValidationResult(submissionId, {
+                accepted: validationResult.accept,
+                rejectionReason: validationResult.rejection_reason || undefined,
+                rejectionCategory: validationResult.rejection_category || undefined,
+              });
+
+              const status = validationResult.accept ? 'pending' : 'rejected';
+              console.log(`[Auto-Grade] DOK4 SPOV "${spov.text.substring(0, 60)}..." → ${status}`);
+              // Do NOT queue dok4:grade here — DOK3 linking is manual and grading hasn't started
+            } catch (err: any) {
+              console.error(`[Auto-Grade] DOK4 SPOV processing failed:`, err.message);
+            }
+          }
+        } else {
+          console.log(`[Auto-Grade] Skipping DOK4 linking: need ≥1 DOK3 (have ${dok3InsightIds.length}) and ≥2 DOK2 (have ${dok2SummaryIds.length})`);
+        }
+      }
+
       // Recompute combined score from fresh DB data (handles DOK1/DOK2/DOK3 weighting)
       await recomputeBrainliftScore(brainlift.id);
     }
