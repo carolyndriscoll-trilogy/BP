@@ -15,4 +15,4 @@ services:
         sync: false  # Set manually in Render dashboard
       - key: PORT
         value: 10000
-    healthCheckPath: /api/brainlifts
+    healthCheckPath: /api/auth/ok
