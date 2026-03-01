@@ -342,6 +342,7 @@ export const brainliftsRelations = relations(brainlifts, ({ one, many }) => ({
   experts: many(experts),
   shares: many(brainliftShares),
   learningStreamItems: many(learningStreamItems),
+  builderCategories: many(builderCategories),
 }));
 
 export const brainliftSharesRelations = relations(brainliftShares, ({ one }) => ({
@@ -877,6 +878,14 @@ export interface BrainliftData extends Brainlift {
     failReason: DOK2FailReason | null;
     sourceVerified: boolean | null;
   }>;
+  knowledgeTree?: {
+    categories: Array<BuilderCategory & {
+      sources: Array<BuilderSource & {
+        facts: BuilderFact[];
+        summaries: BuilderSummary[];
+      }>;
+    }>;
+  };
 }
 
 // Fact with verification data for API response
@@ -1118,6 +1127,124 @@ export type DOK4Dok2Link = typeof dok4Dok2Links.$inferSelect;
 export type InsertDOK4Dok2Link = z.infer<typeof insertDok4Dok2LinkSchema>;
 export type DOK4CoeModelScore = typeof dok4CoeModelScores.$inferSelect;
 export type InsertDOK4CoeModelScore = z.infer<typeof insertDok4CoeModelScoreSchema>;
+
+// === BUILDER KNOWLEDGE TREE TABLES ===
+
+export const builderCategories = pgTable("builder_categories", {
+  id: serial("id").primaryKey(),
+  brainliftId: integer("brainlift_id").notNull().references(() => brainlifts.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  suggestedOrigin: text("suggested_origin"), // null = manual, "ai" = suggested
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_builder_categories_brainlift").on(table.brainliftId),
+]);
+
+export const builderSources = pgTable("builder_sources", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => builderCategories.id, { onDelete: "cascade" }),
+  brainliftId: integer("brainlift_id").notNull().references(() => brainlifts.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  url: text("url"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  discussionStatus: text("discussion_status").$type<'not_started' | 'in_progress' | 'complete'>().default('not_started'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_builder_sources_category").on(table.categoryId),
+  index("idx_builder_sources_brainlift").on(table.brainliftId),
+]);
+
+export const builderFacts = pgTable("builder_facts", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => builderSources.id, { onDelete: "cascade" }),
+  brainliftId: integer("brainlift_id").notNull().references(() => brainlifts.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  sequenceId: integer("sequence_id").notNull().default(0),
+  verificationStatus: text("verification_status").$type<'pending' | 'verified' | 'disputed' | 'unverifiable'>().default('pending'),
+  verificationScore: integer("verification_score"), // 1-5, null until graded
+  confidence: text("confidence"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_builder_facts_source").on(table.sourceId),
+  index("idx_builder_facts_brainlift").on(table.brainliftId),
+]);
+
+export const builderSummaries = pgTable("builder_summaries", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => builderSources.id, { onDelete: "cascade" }),
+  brainliftId: integer("brainlift_id").notNull().references(() => brainlifts.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  relatedFactIds: jsonb("related_fact_ids").$type<number[]>().notNull().default([]),
+  grade: integer("grade"),
+  gradingDimensions: jsonb("grading_dimensions"),
+  spovAlignmentTags: jsonb("spov_alignment_tags").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_builder_summaries_source").on(table.sourceId),
+  index("idx_builder_summaries_brainlift").on(table.brainliftId),
+]);
+
+// Builder Knowledge Tree Relations
+export const builderCategoriesRelations = relations(builderCategories, ({ one, many }) => ({
+  brainlift: one(brainlifts, {
+    fields: [builderCategories.brainliftId],
+    references: [brainlifts.id],
+  }),
+  sources: many(builderSources),
+}));
+
+export const builderSourcesRelations = relations(builderSources, ({ one, many }) => ({
+  category: one(builderCategories, {
+    fields: [builderSources.categoryId],
+    references: [builderCategories.id],
+  }),
+  brainlift: one(brainlifts, {
+    fields: [builderSources.brainliftId],
+    references: [brainlifts.id],
+  }),
+  facts: many(builderFacts),
+  summaries: many(builderSummaries),
+}));
+
+export const builderFactsRelations = relations(builderFacts, ({ one }) => ({
+  source: one(builderSources, {
+    fields: [builderFacts.sourceId],
+    references: [builderSources.id],
+  }),
+  brainlift: one(brainlifts, {
+    fields: [builderFacts.brainliftId],
+    references: [brainlifts.id],
+  }),
+}));
+
+export const builderSummariesRelations = relations(builderSummaries, ({ one }) => ({
+  source: one(builderSources, {
+    fields: [builderSummaries.sourceId],
+    references: [builderSources.id],
+  }),
+  brainlift: one(brainlifts, {
+    fields: [builderSummaries.brainliftId],
+    references: [brainlifts.id],
+  }),
+}));
+
+// Builder Knowledge Tree Schemas
+export const insertBuilderCategorySchema = createInsertSchema(builderCategories).omit({ id: true, createdAt: true });
+export const insertBuilderSourceSchema = createInsertSchema(builderSources).omit({ id: true, createdAt: true });
+export const insertBuilderFactSchema = createInsertSchema(builderFacts).omit({ id: true, createdAt: true });
+export const insertBuilderSummarySchema = createInsertSchema(builderSummaries).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Builder Knowledge Tree Types
+export type BuilderCategory = typeof builderCategories.$inferSelect;
+export type InsertBuilderCategory = z.infer<typeof insertBuilderCategorySchema>;
+export type BuilderSource = typeof builderSources.$inferSelect;
+export type InsertBuilderSource = z.infer<typeof insertBuilderSourceSchema>;
+export type BuilderFact = typeof builderFacts.$inferSelect;
+export type InsertBuilderFact = z.infer<typeof insertBuilderFactSchema>;
+export type BuilderSummary = typeof builderSummaries.$inferSelect;
+export type InsertBuilderSummary = z.infer<typeof insertBuilderSummarySchema>;
 
 // === AUTHORIZATION ===
 

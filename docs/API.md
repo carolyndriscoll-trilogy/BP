@@ -2,10 +2,10 @@
 
 ## Overview
 
-- **Total Endpoints:** 41
-- **Production Endpoints:** 35
+- **Total Endpoints:** 55
+- **Production Endpoints:** 49
 - **Development-Only Endpoints:** 6
-- **Domain Routers:** 8
+- **Domain Routers:** 9
 
 ---
 
@@ -358,3 +358,40 @@ router.patch(
 | `dok4:coe` | After `dok4:grade` completes | 3-model COE jury → Score adjustment |
 | `dok4:conversion` | On conversion submission | Antimemetic conversion evaluation |
 | `dok4:recalculate-foundation` | Manual/triggered | Recompute foundation after linked data changes |
+
+---
+
+## Knowledge Tree (Builder Phase 3) — `server/routes/knowledge-tree.ts`
+
+### Categories
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/brainlifts/:slug/categories` | Access | List categories for brainlift |
+| POST | `/api/brainlifts/:slug/categories` | Modify | Create category `{ name }` |
+| PATCH | `/api/brainlifts/:slug/categories/:id` | Modify | Update category `{ name?, sortOrder? }` |
+| DELETE | `/api/brainlifts/:slug/categories/:id` | Modify | Delete category (cascades) |
+
+### Sources
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/brainlifts/:slug/categories/:categoryId/sources` | Modify | Create source `{ title, url? }` |
+| PATCH | `/api/brainlifts/:slug/sources/:id` | Modify | Update source `{ title?, url?, categoryId? }` |
+| DELETE | `/api/brainlifts/:slug/sources/:id` | Modify | Delete source (cascades) |
+
+### Facts
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/brainlifts/:slug/sources/:sourceId/facts` | Modify | Create fact `{ text }` |
+| PATCH | `/api/brainlifts/:slug/facts/:id` | Modify | Update fact `{ text? }` |
+| DELETE | `/api/brainlifts/:slug/facts/:id` | Modify | Delete fact |
+
+### Summaries
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/brainlifts/:slug/sources/:sourceId/summaries` | Modify | Create summary `{ text, relatedFactIds? }` |
+| PATCH | `/api/brainlifts/:slug/summaries/:id` | Modify | Update summary `{ text?, relatedFactIds? }` |
+| DELETE | `/api/brainlifts/:slug/summaries/:id` | Modify | Delete summary |

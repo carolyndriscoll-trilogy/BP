@@ -99,6 +99,8 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        dok1: "var(--dok1-blue)",
+        dok2: "var(--dok2-green)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

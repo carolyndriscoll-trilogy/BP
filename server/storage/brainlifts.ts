@@ -8,6 +8,7 @@ import {
 } from './base';
 import { getDOK2Summaries, deleteDOK2Summaries } from './dok2';
 import { getSharedBrainlifts } from './shares';
+import { getKnowledgeTree } from './knowledge-tree';
 
 export async function getBrainliftBySlug(slug: string): Promise<BrainliftData | undefined> {
   const [brainlift] = await db.select().from(brainlifts).where(eq(brainlifts.slug, slug));
@@ -18,6 +19,7 @@ export async function getBrainliftBySlug(slug: string): Promise<BrainliftData | 
   const clusters = await db.select().from(contradictionClusters).where(eq(contradictionClusters.brainliftId, brainlift.id));
   const brainliftExperts = await db.select().from(experts).where(eq(experts.brainliftId, brainlift.id));
   const dok2SummariesData = await getDOK2Summaries(brainlift.id);
+  const knowledgeTree = brainlift.sourceType === 'builder' ? await getKnowledgeTree(brainlift.id) : undefined;
 
   return {
     ...brainlift,
@@ -26,6 +28,7 @@ export async function getBrainliftBySlug(slug: string): Promise<BrainliftData | 
     contradictionClusters: clusters,
     experts: brainliftExperts.sort((a, b) => (b.rankScore ?? 0) - (a.rankScore ?? 0)),
     dok2Summaries: dok2SummariesData.length > 0 ? dok2SummariesData : undefined,
+    knowledgeTree,
   };
 }
 
@@ -43,6 +46,7 @@ export async function getBrainliftDataById(id: number): Promise<BrainliftData | 
   const clusters = await db.select().from(contradictionClusters).where(eq(contradictionClusters.brainliftId, brainlift.id));
   const brainliftExperts = await db.select().from(experts).where(eq(experts.brainliftId, brainlift.id));
   const dok2SummariesData = await getDOK2Summaries(brainlift.id);
+  const knowledgeTree = brainlift.sourceType === 'builder' ? await getKnowledgeTree(brainlift.id) : undefined;
 
   return {
     ...brainlift,
@@ -51,6 +55,7 @@ export async function getBrainliftDataById(id: number): Promise<BrainliftData | 
     contradictionClusters: clusters,
     experts: brainliftExperts.sort((a, b) => (b.rankScore ?? 0) - (a.rankScore ?? 0)),
     dok2Summaries: dok2SummariesData.length > 0 ? dok2SummariesData : undefined,
+    knowledgeTree,
   };
 }
 

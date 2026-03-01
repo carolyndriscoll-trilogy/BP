@@ -13,6 +13,7 @@ import * as dok3Storage from './dok3';
 import * as importAgentStorage from './import-agent';
 import * as brainliftSourcesStorage from './brainlift-sources';
 import * as dok4Storage from './dok4';
+import * as knowledgeTreeStorage from './knowledge-tree';
 
 // Re-export types from base
 export type {
@@ -142,6 +143,23 @@ export const storage = {
   getBrainliftSources: brainliftSourcesStorage.getBrainliftSources,
   deleteBrainliftSources: brainliftSourcesStorage.deleteBrainliftSources,
 
+  // Knowledge Tree (Builder Phase 3)
+  createCategory: knowledgeTreeStorage.createCategory,
+  updateCategoryForBrainlift: knowledgeTreeStorage.updateCategoryForBrainlift,
+  deleteCategoryForBrainlift: knowledgeTreeStorage.deleteCategoryForBrainlift,
+  getCategoriesForBrainlift: knowledgeTreeStorage.getCategoriesForBrainlift,
+  createBuilderSource: knowledgeTreeStorage.createBuilderSource,
+  updateBuilderSourceForBrainlift: knowledgeTreeStorage.updateBuilderSourceForBrainlift,
+  deleteBuilderSourceForBrainlift: knowledgeTreeStorage.deleteBuilderSourceForBrainlift,
+  createBuilderFact: knowledgeTreeStorage.createBuilderFact,
+  updateBuilderFactForBrainlift: knowledgeTreeStorage.updateBuilderFactForBrainlift,
+  deleteBuilderFactForBrainlift: knowledgeTreeStorage.deleteBuilderFactForBrainlift,
+  getFactsForBuilderSource: knowledgeTreeStorage.getFactsForBuilderSource,
+  createBuilderSummary: knowledgeTreeStorage.createBuilderSummary,
+  updateBuilderSummaryForBrainlift: knowledgeTreeStorage.updateBuilderSummaryForBrainlift,
+  deleteBuilderSummaryForBrainlift: knowledgeTreeStorage.deleteBuilderSummaryForBrainlift,
+  getKnowledgeTree: knowledgeTreeStorage.getKnowledgeTree,
+
   // DOK4 Submissions
   createDOK4Submission: dok4Storage.createDOK4Submission,
   getDOK4Submissions: dok4Storage.getDOK4Submissions,
@@ -164,4 +182,4 @@ export const storage = {
 };
 
 // Export individual modules for direct access if needed
-export { brainliftsStorage, expertsStorage, verificationsStorage, redundancyStorage, analyticsStorage, dok2Storage, sharesStorage, learningStreamStorage, dok3Storage, importAgentStorage, brainliftSourcesStorage, dok4Storage };
+export { brainliftsStorage, expertsStorage, verificationsStorage, redundancyStorage, analyticsStorage, dok2Storage, sharesStorage, learningStreamStorage, dok3Storage, importAgentStorage, brainliftSourcesStorage, dok4Storage, knowledgeTreeStorage };
