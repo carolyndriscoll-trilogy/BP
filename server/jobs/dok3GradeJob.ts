@@ -99,6 +99,25 @@ export async function dok3GradeJob(
     });
 
     helpers.logger.info(`[DOK3 Grade] Insight ${insightId} graded: score=${result.score}`);
+
+    // Check for pending DOK4 submissions that may now be ready for grading
+    try {
+      const pendingDok4 = await storage.getDOK4Submissions(brainliftId);
+      for (const sub of pendingDok4) {
+        if (sub.status === 'pending') {
+          const gateStatus = await storage.checkDOK4FoundationReady(sub.id);
+          if (gateStatus.ready) {
+            const { withJob } = await import('../utils/withJob');
+            await withJob('dok4:grade')
+              .forPayload({ submissionId: sub.id, brainliftId })
+              .queue();
+            helpers.logger.info(`[DOK3 Grade] Queued DOK4 grading for submission ${sub.id}`);
+          }
+        }
+      }
+    } catch (dok4Err: any) {
+      helpers.logger.error(`[DOK3 Grade] DOK4 trigger check failed (non-blocking):`, { err: dok4Err });
+    }
   } catch (err: any) {
     helpers.logger.error(`[DOK3 Grade] Grading failed for insight ${insightId}:`, { err });
     await storage.updateDOK3InsightStatus(insightId, brainliftId, 'error');

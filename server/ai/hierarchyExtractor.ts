@@ -16,6 +16,7 @@ import type {
   DOK2SummaryGroup,
   DOK2SummaryPoint,
   DOK3ExtractedInsight,
+  DOK4ExtractedSPOV,
   FullHierarchyExtractionResult,
 } from '@shared/hierarchy-types';
 
@@ -57,8 +58,8 @@ export function buildParentMap(roots: HierarchyNode[]): Map<string, HierarchyNod
  * Excludes DOK1/DOK2 marker subtrees to avoid picking up unrelated URLs
  */
 function findUrlInSubtree(node: HierarchyNode): string | null {
-  // Don't search inside DOK1/DOK2/DOK3 markers - those have their own content
-  if (node.isDOK1Marker || node.isDOK2Marker || node.isDOK3Marker) {
+  // Don't search inside DOK1/DOK2/DOK3/DOK4 markers - those have their own content
+  if (node.isDOK1Marker || node.isDOK2Marker || node.isDOK3Marker || node.isDOK4Marker) {
     return null;
   }
 
@@ -198,7 +199,7 @@ function extractFactsFromDOK1Node(
   function collectFacts(node: HierarchyNode) {
     for (const child of node.children) {
       // Skip marker nodes (DOK2, etc.)
-      if (child.isDOK1Marker || child.isDOK2Marker || child.isDOK3Marker || child.isSourceMarker || child.isCategoryMarker) {
+      if (child.isDOK1Marker || child.isDOK2Marker || child.isDOK3Marker || child.isDOK4Marker || child.isSourceMarker || child.isCategoryMarker) {
         continue;
       }
 
@@ -225,7 +226,7 @@ function extractFactsFromDOK1Node(
       // Also check grandchildren (nested facts under bullet points)
       for (const grandchild of child.children) {
         const grandchildText = grandchild.name.trim();
-        if (grandchildText.length >= 10 && !grandchild.isDOK1Marker && !grandchild.isDOK2Marker && !grandchild.isDOK3Marker) {
+        if (grandchildText.length >= 10 && !grandchild.isDOK1Marker && !grandchild.isDOK2Marker && !grandchild.isDOK3Marker && !grandchild.isDOK4Marker) {
           facts.push({
             id: `${idCounter++}`,
             fact: grandchildText,
@@ -509,7 +510,7 @@ function collectNestedText(
   const results: { text: string; depth: number }[] = [];
 
   // Skip marker nodes entirely
-  if (node.isDOK1Marker || node.isDOK2Marker || node.isDOK3Marker || node.isSourceMarker || node.isCategoryMarker) {
+  if (node.isDOK1Marker || node.isDOK2Marker || node.isDOK3Marker || node.isDOK4Marker || node.isSourceMarker || node.isCategoryMarker) {
     return results;
   }
 
@@ -648,7 +649,7 @@ export function extractDOK3Insights(roots: HierarchyNode[]): DOK3ExtractedInsigh
   for (const dok3Node of dok3Nodes) {
     for (const child of dok3Node.children) {
       // Skip marker nodes
-      if (child.isDOK1Marker || child.isDOK2Marker || child.isDOK3Marker ||
+      if (child.isDOK1Marker || child.isDOK2Marker || child.isDOK3Marker || child.isDOK4Marker ||
           child.isSourceMarker || child.isCategoryMarker) {
         continue;
       }
@@ -674,8 +675,69 @@ export function extractDOK3Insights(roots: HierarchyNode[]): DOK3ExtractedInsigh
   return insights;
 }
 
+// ============================================================================
+// DOK4 EXTRACTION
+// ============================================================================
+
 /**
- * Combined extraction - returns DOK1 facts, DOK2 summaries, and DOK3 insights
+ * Find all DOK4 marker nodes at any depth in the hierarchy
+ */
+export function findDOK4Nodes(roots: HierarchyNode[]): HierarchyNode[] {
+  const results: HierarchyNode[] = [];
+
+  function traverse(node: HierarchyNode) {
+    if (node.isDOK4Marker) {
+      results.push(node);
+    }
+    node.children.forEach(traverse);
+  }
+
+  roots.forEach(traverse);
+  return results;
+}
+
+/**
+ * Extract DOK4 SPOVs from DOK4 marker children
+ * Each child of a DOK4 marker is treated as a separate Spiky Point of View
+ */
+export function extractDOK4SPOVs(roots: HierarchyNode[]): DOK4ExtractedSPOV[] {
+  const dok4Nodes = findDOK4Nodes(roots);
+  const spovs: DOK4ExtractedSPOV[] = [];
+  let counter = 0;
+
+  log(`[DOK4Extractor] Found ${dok4Nodes.length} DOK4 marker nodes`);
+
+  for (const dok4Node of dok4Nodes) {
+    for (const child of dok4Node.children) {
+      // Skip marker nodes
+      if (child.isDOK1Marker || child.isDOK2Marker || child.isDOK3Marker || child.isDOK4Marker ||
+          child.isSourceMarker || child.isCategoryMarker) {
+        continue;
+      }
+
+      // Collect the full text of this SPOV (including nested children)
+      const nestedParts = collectNestedText(child, 0, false);
+      const fullText = nestedParts.length > 0
+        ? nestedParts.map(p => '  '.repeat(p.depth) + p.text).join('\n')
+        : child.name.trim();
+
+      if (fullText.length < 10) continue; // Skip very short entries
+
+      counter++;
+      spovs.push({
+        id: String(counter),
+        text: fullText,
+        workflowyNodeId: child.id,
+      });
+    }
+  }
+
+  log(`[DOK4Extractor] Extracted ${spovs.length} DOK4 SPOVs`);
+  return spovs;
+}
+
+/**
+ * Combined extraction - returns DOK1 facts, DOK2 summaries, DOK3 insights, and DOK4 SPOVs
  */
 export function extractAllFromHierarchy(roots: HierarchyNode[]): FullHierarchyExtractionResult {
   // Extract DOK1 first (existing logic)
@@ -687,17 +749,23 @@ export function extractAllFromHierarchy(roots: HierarchyNode[]): FullHierarchyEx
   // Extract DOK3 insights
   const dok3Insights = extractDOK3Insights(roots);
 
+  // Extract DOK4 SPOVs
+  const dok4SPOVs = extractDOK4SPOVs(roots);
+
   return {
     facts: dok1Result.facts,
     dok2Summaries,
     dok3Insights,
+    dok4SPOVs,
     metadata: {
       dok1NodesFound: dok1Result.metadata.dok1NodesFound,
       dok2NodesFound: findDOK2Nodes(roots).length,
       dok3NodesFound: findDOK3Nodes(roots).length,
+      dok4NodesFound: findDOK4Nodes(roots).length,
       totalFactsExtracted: dok1Result.metadata.totalFactsExtracted,
       totalDOK2PointsExtracted: dok2Summaries.reduce((sum, g) => sum + g.points.length, 0),
       totalDOK3InsightsExtracted: dok3Insights.length,
+      totalDOK4SPOVsExtracted: dok4SPOVs.length,
       sourcesAttributed: dok1Result.metadata.sourcesAttributed,
       categoriesFound: dok1Result.metadata.categoriesFound,
     },

@@ -25,7 +25,6 @@ import { SummariesTab } from '@/components/SummariesTab';
 import { InsightsTab } from '@/components/InsightsTab';
 import { ScratchpadTab } from '@/components/ScratchpadTab';
 import { DOK4Tab } from '@/components/DOK4Tab';
-import { DOK4SubmitModal } from '@/components/DOK4SubmitModal';
 import { DOK3LinkingUI } from '@/components/DOK3LinkingUI';
 import { LearningStreamTab } from '@/components/LearningStreamTab';
 import { SavedItemsPage, GradedItemsPage } from '@/components/learning-stream';
@@ -204,7 +203,6 @@ const { downloadBrainliftPDF } = usePDFExport();
   // DOK4 SPOVs
   const dok4 = useDOK4(slug);
   const dok4Events = useDOK4GradingEvents(slug, dok4.runningSubmissions.length > 0);
-  const [showDOK4SubmitModal, setShowDOK4SubmitModal] = useState(false);
 
   // Redundancy detection
   const [showRedundancyModal, setShowRedundancyModal] = useState(false);
@@ -402,7 +400,6 @@ const { downloadBrainliftPDF } = usePDFExport();
           highQualityCount={dok4.highQualityCount}
           needsWorkCount={dok4.needsWorkCount}
           latestEvent={dok4Events.latestEvent}
-          onNewSubmission={() => setShowDOK4SubmitModal(true)}
         />
       )}
 
@@ -481,16 +478,6 @@ const { downloadBrainliftPDF } = usePDFExport();
         onClose={() => setShowShareModal(false)}
         slug={slug}
         isOwner={isOwner}
-      />
-
-      {/* DOK4 Submit Modal */}
-      <DOK4SubmitModal
-        show={showDOK4SubmitModal}
-        onClose={() => setShowDOK4SubmitModal(false)}
-        onSubmit={dok4.submit}
-        isSubmitting={dok4.isSubmitting}
-        insights={dok3.insights}
-        dok2Summaries={(data?.dok2Summaries ?? []) as any}
       />
 
       {/* DOK3 Linking Modal (standalone, outside import flow) */}
