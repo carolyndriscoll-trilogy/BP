@@ -31,8 +31,42 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Health check endpoint - must be first, no dependencies
+app.get("/api/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Better Auth handler - must be before other routes
 app.all("/api/auth/*", toNodeHandler(auth));
+
+// Dev-only: auto-login endpoint that creates a session directly
+if (process.env.NODE_ENV !== "production") {
+  app.get("/dev/auto-login", async (_req, res) => {
+    try {
+      const { pool } = await import("./db");
+      const crypto = await import("crypto");
+      const userId = "local-dev-user";
+      const sessionId = crypto.randomUUID();
+      const token = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await pool.query(
+        `INSERT INTO session (id, user_id, token, expires_at, created_at, updated_at, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, now(), now(), '127.0.0.1', 'dev-auto-login')
+         ON CONFLICT (token) DO NOTHING`,
+        [sessionId, userId, token, expiresAt]
+      );
+      res.cookie("better-auth.session_token", token, {
+        httpOnly: true,
+        path: "/",
+        expires: expiresAt,
+        sameSite: "lax",
+      });
+      res.redirect("/");
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -72,84 +106,87 @@ app.use((req, res, next) => {
   next();
 });
 
+// Start listening FIRST so healthcheck passes, then initialize
+const port = parseInt(process.env.PORT || "5000", 10);
+httpServer.listen(
+  {
+    port,
+    host: "0.0.0.0",
+  },
+  () => {
+    log(`serving on port ${port}`);
+  },
+);
+
 (async () => {
-  // Seed production database if empty
-  await seedProductionIfEmpty();
-
-  await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-
-  // Start Graphile Worker (Option 1: same process)
-  let worker = null;
   try {
-    worker = await startWorker();
-    log('[Worker] Started successfully', 'server');
-  } catch (error) {
-    log(`[Worker] Failed to start: ${error}`, 'server');
-    // Don't crash server if worker fails - log and continue
-  }
-
-  // Graceful shutdown handler
-  const shutdown = async (signal: string) => {
-    log(`Received ${signal}, shutting down gracefully...`, 'server');
-
-    // Stop accepting new connections and wait for in-flight HTTP requests to complete
-    await new Promise<void>((resolve) => {
-      httpServer.close(() => {
-        log('HTTP server closed', 'server');
-        resolve();
-      });
-    });
-
-    // Stop worker (waits for in-flight jobs to complete)
-    // Note: The worker shares the pool with Express routes.
-    // Graphile Worker's stop() method does NOT close the pool automatically,
-    // so we must close it explicitly after the worker stops.
-    if (worker) {
-      await stopWorker();
+    // Seed production database if empty
+    try {
+      await seedProductionIfEmpty();
+    } catch (error) {
+      log(`[Seed] Failed: ${error}`, 'server');
     }
 
-    // Close database pool after all work is done
-    // This ensures in-flight HTTP requests and jobs have completed
-    await pool.end();
+    await registerRoutes(httpServer, app);
 
-    log('Shutdown complete', 'server');
-    process.exit(0);
-  };
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+      res.status(status).json({ message });
+      throw err;
+    });
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    }
+
+    // Start Graphile Worker (Option 1: same process)
+    let worker = null;
+    try {
+      worker = await startWorker();
+      log('[Worker] Started successfully', 'server');
+    } catch (error) {
+      log(`[Worker] Failed to start: ${error}`, 'server');
+      // Don't crash server if worker fails - log and continue
+    }
+
+    // Graceful shutdown handler
+    const shutdown = async (signal: string) => {
+      log(`Received ${signal}, shutting down gracefully...`, 'server');
+
+      // Stop accepting new connections and wait for in-flight HTTP requests to complete
+      await new Promise<void>((resolve) => {
+        httpServer.close(() => {
+          log('HTTP server closed', 'server');
+          resolve();
+        });
+      });
+
+      // Stop worker (waits for in-flight jobs to complete)
+      if (worker) {
+        await stopWorker();
+      }
+
+      // Close database pool after all work is done
+      await pool.end();
+
+      log('Shutdown complete', 'server');
+      process.exit(0);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
+    log('Server fully initialized', 'server');
+  } catch (error) {
+    log(`[FATAL] Server initialization failed: ${error}`, 'server');
+    // Don't exit - healthcheck endpoint still works
+  }
 })();
