@@ -415,41 +415,56 @@ Guides see a leaderboard of all student defenses with drill-down into per-level 
 
 ---
 
-## Honcho — Persistent Learning Companion
+## Honcho — Persistent Learner Profile
 
-Every feature described above produces learning signals: grading results, discussion transcripts, adversary defense outcomes, BrainLift edits, bookmarked resources, time spent reading. Honcho is the memory layer that reasons about these signals over time and builds a continuous learner profile.
+Honcho is the memory layer that builds a persistent learner profile for each student. Instead of every agent interaction starting from scratch, agents know the student's patterns, strengths, and growth areas from prior sessions. The integration uses the `@honcho-ai/sdk` with a peer-based architecture where each agent builds its own theory-of-mind representation of the student.
 
-### How It Works
+### Architecture
 
-Honcho's peer system tracks both the learner and the learning companion agent as peers within a shared workspace. Platform events flow into a silent `activity-log` session — a background stream of everything the user does, reasoned about without requiring explicit chat. When the student opens a conversation, the agent already knows what they've been working on.
+```
+Workspace: brainlift-platform
+├── Peers:
+│   ├── student-{userId}     ← the learner (accumulates representations)
+│   ├── discussion-agent     ← study partner identity
+│   ├── import-agent         ← import guide identity
+│   └── grading-agent        ← evaluator identity
+└── Sessions:
+    ├── discussion-{slug}-{timestamp}  ← per discussion thread
+    └── import-{slug}                  ← per import (reused on resume)
+```
 
-### Session Types
+Each agent peer builds its own representation of the student peer through two channels:
 
-| Type | Purpose |
-|------|---------|
-| `learning-chat` | Open-ended conversation about their BrainLift, feedback, questions |
-| `resource-discussion` | Focused chat about a specific learning stream resource |
-| `dok-feedback` | Agent walks through grading results, suggests improvements |
-| `activity-log` | Silent session — platform events flow in, no chat UI |
+**Messages** — After each discussion or import conversation, the full exchange is stored to Honcho with peer attribution (`studentPeer.message(...)` / `agentPeer.message(...)`). Honcho processes these in the background to derive conclusions about the student.
 
-### What Feeds Into Honcho
+**Conclusions** — After grading (DOK3/DOK4) and import completion, structured observations are stored as conclusions: what the agent observed about the student (scores, frameworks applied, feedback given).
 
-- **DOK grading results** — "scored 7/10 on DOK1 facts, missed facts about X and Y"
-- **Discussion exchanges** — what questions the student asked, what they articulated, where they struggled
-- **Adversary defense transcripts** — where they held up, where they broke down, which axes scored low
-- **BrainLift edits** — "added 3 new experts in education technology this week"
-- **Learning stream interactions** — what they bookmarked, what they discarded, how long they spent reading
-- **DOK progression events** — "first DOK2 summary graded, strong on fact extraction but struggled with synthesis"
+### Theory of Mind
 
-Honcho's reasoning engine processes these and draws conclusions: this learner is strong at DOK1 fact extraction but consistently struggles moving from DOK2 summaries to DOK3 insights. They respond well to concrete examples rather than abstractions. They've been adding sources all week but haven't written summaries yet.
+Each agent sees the student differently because they interact in different contexts. When an agent needs learner context, it queries its own representation of the student:
 
-### Representation Queries
+```typescript
+// "discussion-agent, what do you know about student-123?"
+const context = await agentPeer.chat(query, { target: studentPeerId });
+```
 
-The learner profile is queryable, feeding into personalized features:
-- **Adaptive learning stream** — surface resources matching the learner's actual DOK level and interests
-- **Contextual grading feedback** — aware of where this specific learner consistently struggles
-- **Targeted nudges** — "your DOK3 insights on X need more DOK1 support" instead of generic reminders
-- **Adversary defense preparation** — identify which axes need strengthening before the next attempt
+The `discussion-agent` knows how the student reasons through problems and handles Socratic prompts. The `grading-agent` knows scores, framework application, and quality patterns. Same student, different lenses. The profile gets richer with every interaction.
+
+### Where It's Wired In
+
+| Agent | Reads Profile | Writes Messages | Writes Conclusions |
+|-------|:---:|:---:|:---:|
+| Discussion Agent | Before building system prompt | After each conversation | — |
+| Import Agent | Before building system prompt | After each conversation | On import completion (DOK counts) |
+| DOK3 Grading | Before evaluation | — | After grading (score, framework, feedback) |
+| DOK4 Grading | Before quality evaluation | — | After grading (score, raw score, feedback) |
+| Learning Stream | Before orchestrator prompt | — | — |
+
+The learner profile is injected as a `## LEARNER PROFILE` section in each agent's system prompt, giving them awareness of the student's history without changing any agent's core behavior.
+
+### Graceful Degradation
+
+Everything is gated on `HONCHO_API_KEY`. If not set, every function returns `null` or no-ops, and the platform works identically to before — no code paths change, no errors thrown. The central client module (`server/utils/honcho.ts`) wraps all calls in try/catch so Honcho failures never break the app.
 
 ---
 
@@ -536,5 +551,7 @@ docker exec -i wizardly_kalam psql -U postgres -d dok1grader_local < migrations/
 | `EXA_API_KEY` | Exa search API (research swarm) |
 | `YOUTUBE_API_KEY` | YouTube Data API (video researcher agent) |
 | `JINA_API_KEY` | Jina Reader API (article content extraction) |
+| `HONCHO_API_KEY` | Honcho learner profile API (optional — platform works without it) |
+| `HONCHO_WORKSPACE_ID` | Honcho workspace ID (default: `brainlift-platform`) |
 | `SWARM_AGENT_COUNT` | Research agents per swarm (default: 5) |
 | `WORKER_CONCURRENCY` | Background job concurrency (default: 3) |
