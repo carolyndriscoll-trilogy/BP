@@ -1,13 +1,3 @@
-import OpenAI from "openai";
-
-// Using Replit AI Integrations for OpenAI access.
-// Does not require your own API key.
-// Charges are billed to your Replit credits.
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "dummy",
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
-
 async function callSummarizeAPI(model: string, fullText: string): Promise<string> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',

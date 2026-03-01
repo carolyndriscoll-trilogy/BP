@@ -7,10 +7,16 @@ import { extractAllFromHierarchy, convertToExtractorFormat, extractPurposeFromHi
 // Feature flag for hierarchy-based extraction
 const USE_HIERARCHY_EXTRACTION = process.env.USE_HIERARCHY_EXTRACTION === 'true';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1',
+    });
+  }
+  return _openai;
+}
 
 const brainliftOutputSchema = z.object({
   classification: z.enum(['brainlift', 'partial', 'not_brainlift']),
@@ -59,7 +65,7 @@ async function extractFactsWithLLM(content: string, title: string): Promise<any[
   console.log('[DOK1 Extractor] FALLBACK: Using LLM to extract facts...');
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "qwen/qwen3-32b",
       messages: [
         {
@@ -132,7 +138,7 @@ async function summarizePurposeForDisplay(fullPurpose: string, title: string): P
   console.log(`[Purpose Summarizer] Summarizing ${fullPurpose.length} char purpose...`);
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "google/gemini-2.0-flash-001",
       messages: [
         {
@@ -621,7 +627,7 @@ export async function findContradictions(facts: any[]): Promise<any[]> {
   if (facts.length < 2) return [];
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "anthropic/claude-sonnet-4", // Changed from Opus 4.5 - too slow for import pipeline
       messages: [
         {
