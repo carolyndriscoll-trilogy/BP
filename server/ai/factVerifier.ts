@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { LLM_MODELS, LLM_MODEL_NAMES, type LLMModel, type VerificationStatus } from '@shared/schema';
-import { callOpenRouterModel } from './llm-utils';
+import pRetry from 'p-retry';
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 const modelGradeSchema = z.object({
   score: z.number().min(1).max(5),
@@ -84,7 +86,39 @@ SOURCE_LINK_FAILED: ${linkFailed}
 Grade this claim based on available evidence OR your knowledge of educational research literature. Provide a substantive rationale explaining your assessment.`;
 
   const run = async () => {
-    const content = await callOpenRouterModel(model, GRADING_SYSTEM_PROMPT, userPrompt, 800, 0.1);
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://replit.com',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: GRADING_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 800,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.error(`[RATE-LIMIT] 429 from ${model} - too many requests`);
+        throw new Error(`RATE_LIMIT: ${model}`);
+      }
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('No response content');
+    }
 
     // Remove markdown code blocks if present
     let cleanContent = content
@@ -137,7 +171,12 @@ Grade this claim based on available evidence OR your knowledge of educational re
   };
 
   try {
-    const result = await run();
+    const result = await pRetry(run, {
+      retries: 2,
+      onFailedAttempt: error => {
+        console.log(`Model ${model} attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`);
+      }
+    });
 
     return {
       model,

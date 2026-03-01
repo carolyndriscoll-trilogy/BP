@@ -14,9 +14,10 @@
  */
 
 import pLimit from 'p-limit';
+import pRetry from 'p-retry';
 import { storage } from '../storage';
-import { callOpenRouterModel } from './llm-utils';
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = 'anthropic/claude-haiku-4.5';
 
 interface InsightInput {
@@ -34,8 +35,47 @@ async function callModel(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured');
+  }
+
+  const body = {
+    model: MODEL,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0,
+    max_tokens: 512,
+  };
+
   console.log(`[DOK3 Ranker] API request to ${MODEL}, prompt length: ${systemPrompt.length + userPrompt.length} chars`);
-  return callOpenRouterModel(MODEL, systemPrompt, userPrompt, 512, 0);
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://replit.com',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    console.error(`[DOK3 Ranker] API error ${response.status}: ${errBody.substring(0, 500)}`);
+    if (response.status === 429) throw new Error(`RATE_LIMIT: ${MODEL}`);
+    throw new Error(`API error: ${response.status} - ${errBody.substring(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    console.error('[DOK3 Ranker] No content in response:', JSON.stringify(data).substring(0, 500));
+    throw new Error('No response content');
+  }
+  return content as string;
 }
 
 const SYSTEM_PROMPT = `You are a research assistant helping a knowledge worker link analytical insights to their source materials.
@@ -138,8 +178,17 @@ async function rankSingleInsight(
   console.log(`[DOK3 Ranker] [Insight ${insight.id}] Text: "${insight.text.substring(0, 120)}${insight.text.length > 120 ? '...' : ''}"`);
   console.log(`[DOK3 Ranker] [Insight ${insight.id}] Full user prompt:\n${userPrompt}`);
 
-  const raw = await callModel(SYSTEM_PROMPT, userPrompt);
-  return parseRankings(raw, sources, insight.id);
+  const call = async () => {
+    const raw = await callModel(SYSTEM_PROMPT, userPrompt);
+    return parseRankings(raw, sources, insight.id);
+  };
+
+  return pRetry(call, {
+    retries: 2,
+    onFailedAttempt: (err) => {
+      console.warn(`[DOK3 Ranker] Attempt ${err.attemptNumber} failed for insight ${insight.id}: ${err.error.message}`);
+    },
+  });
 }
 
 /**

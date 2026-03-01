@@ -1,6 +1,6 @@
 import { Fact } from '@shared/schema';
-import { callOpenRouterModel } from './llm-utils';
 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = 'anthropic/claude-sonnet-4';
 
 interface RedundancyGroup {
@@ -87,7 +87,37 @@ ${JSON.stringify(factsForAnalysis, null, 2)}
 Find redundant groups and identify the core non-redundant facts.`;
 
   try {
-    const content = await callOpenRouterModel(MODEL, REDUNDANCY_SYSTEM_PROMPT, userPrompt, 4000, 0.1);
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://replit.com',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: REDUNDANCY_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 4000,
+      }),
+      signal: AbortSignal.timeout(120_000), // 2 minute timeout
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Redundancy analysis failed:', errorText);
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('No response from AI model');
+    }
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {

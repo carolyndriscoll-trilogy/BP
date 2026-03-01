@@ -7,12 +7,14 @@
  */
 
 import { z } from 'zod';
+import pRetry from 'p-retry';
 import { DOK4_MODELS } from '@shared/schema';
-import { callOpenRouterModel, extractJSON } from './llm-utils';
 import {
   DOK4_POV_VALIDATION_SYSTEM_PROMPT,
   buildDOK4POVValidationUserPrompt,
 } from '../prompts/dok4-pov-validation';
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 // ─── Zod Schema ──────────────────────────────────────────────────────────────
 
@@ -31,6 +33,69 @@ const povValidationSchema = z.object({
 });
 
 export type POVValidationResult = z.infer<typeof povValidationSchema>;
+
+// ─── LLM Call ────────────────────────────────────────────────────────────────
+
+async function callValidationModel(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured');
+  }
+
+  const run = async () => {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://replit.com',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.0,
+        max_tokens: 500,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error(`RATE_LIMIT: ${model}`);
+      }
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('No response content');
+    return content as string;
+  };
+
+  return pRetry(run, {
+    retries: 2,
+    onFailedAttempt: error => {
+      console.log(`[DOK4-Validate] Model ${model} attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`);
+    },
+  });
+}
+
+function extractJSON(raw: string): unknown {
+  const clean = raw
+    .replace(/```json\s*/gi, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Could not find JSON in response');
+  return JSON.parse(jsonMatch[0]);
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -67,21 +132,17 @@ export async function validateDOK4POV(
   let raw: string;
 
   try {
-    raw = await callOpenRouterModel(
+    raw = await callValidationModel(
       DOK4_MODELS.GEMINI_FLASH,
       DOK4_POV_VALIDATION_SYSTEM_PROMPT,
-      userPrompt,
-      500,
-      0.0
+      userPrompt
     );
   } catch (primaryErr: any) {
     console.log(`[DOK4-Validate] Gemini Flash failed: ${primaryErr.message}, trying Sonnet fallback`);
-    raw = await callOpenRouterModel(
+    raw = await callValidationModel(
       DOK4_MODELS.SONNET_MID,
       DOK4_POV_VALIDATION_SYSTEM_PROMPT,
-      userPrompt,
-      500,
-      0.0
+      userPrompt
     );
   }
 
