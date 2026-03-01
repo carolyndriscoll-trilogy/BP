@@ -7,6 +7,7 @@ React 18 + TypeScript frontend in `client/`. Uses TanStack Query for server stat
 **Key directories:**
 - `client/src/pages/` - Route-level components (thin orchestration layers)
 - `client/src/components/` - UI components, grouped by feature
+- `client/src/components/builder/` - BrainLift Builder (native authoring flow)
 - `client/src/hooks/` - Custom hooks for data fetching and business logic
 - `client/src/lib/` - Utilities, API client, constants
 
@@ -98,6 +99,7 @@ app.use(verificationsRouter);
 2. **Complex logic?** Extract to `services/` - routes should be thin
 3. **Reusable utility?** Add to `utils/`
 4. **New AI capability?** Add to `ai/`
+5. **Builder phase?** Add component in `client/src/components/builder/`, wire into `BuilderView.tsx`
 
 ### Rules
 
@@ -127,22 +129,24 @@ Deploying code that expects schema changes before the DB has them = broken prod.
    docker exec -i wizardly_kalam psql -U postgres -d dok1grader_local < migrations/XXXX_migration_file.sql
    ```
 3. Develop and test against the local DB
-4. **Only when ready to deploy to prod**, apply to Neon:
-   - Use `mcp__Neon__prepare_database_migration` (creates temp branch, tests migration)
-   - Verify with `mcp__Neon__describe_table_schema`
-   - Apply with `mcp__Neon__complete_database_migration`
+4. **Only when ready to deploy to prod**, apply to Railway Postgres:
+   ```bash
+   docker exec -i wizardly_kalam psql "$RAILWAY_DATABASE_URL" -f - < migrations/XXXX_migration_file.sql
+   ```
 5. Then merge/push to main
-
-**⚠️ NEVER use Neon MCP tools during development. Neon is for PRODUCTION only.**
 
 **Local dev config:**
 - Docker container: `wizardly_kalam`
 - Database: `dok1grader_local`
 - User: `postgres`
 
-**Neon prod config:**
-- Project: `dok1grader` (ID: `restless-pine-13558418`)
-- Database: `neondb`
+**Production config (Railway Postgres):**
+- Host: `shortline.proxy.rlwy.net:37725`
+- Database: `railway`
+- Apply migrations via Docker psql:
+  ```bash
+  docker exec -i wizardly_kalam psql "$RAILWAY_DATABASE_URL" -f - < migrations/XXXX_migration_file.sql
+  ```
 - Migrations dir: `migrations/`
 
 ### Authentication & Authorization
@@ -337,3 +341,53 @@ boxShadow: { card: "var(--shadow-card)" }
 ### Refactoring
 
 Use the `styler` sub-agent (`.claude/agents/styler.md`) for batch conversion of inline styles to Tailwind.
+
+---
+
+## BrainLift Builder
+
+Native authoring flow as an alternative to importing from WorkFlowy/Google Docs. Builder brainlifts use `sourceType: 'builder'`.
+
+### Architecture
+
+- **Dashboard.tsx** — Detects `?mode=build` URL param, renders `<BuilderView>` instead of tab content
+- **BuilderView** — Phase sidebar (1–6) + active phase component. Phase from `?phase=N` param
+- **DashboardHeader** — Shows Build/View toggle for builder brainlifts (`sourceType === 'builder'`)
+- **AddBrainliftModal** — "Build from Scratch" button calls `POST /api/brainlifts/create-blank`
+
+### Build Phases
+
+| Phase | Component | Status |
+|-------|-----------|--------|
+| 1. You & Your Purpose | `PurposePhase.tsx` | Implemented |
+| 2. Your Experts | `ExpertsPhase.tsx` + `ExpertCard.tsx` | Implemented |
+| 3. Your Sources | — | Stubbed (locked) |
+| 4. Your Facts | — | Stubbed (locked) |
+| 5. Your Summaries | — | Stubbed (locked) |
+| 6. Your Insights | — | Stubbed (locked) |
+
+### Key Patterns
+
+- **Auto-save**: `useAutoSave` hook — debounced (1500ms) on change, immediate on blur. Returns `saveStatus` for UI indicator
+- **Domain hook**: `useBuilder(slug)` — updatePurpose, synthesizePurpose, createExpert, updateExpert mutations
+- **Existing hooks reused**: `useExperts` for toggleFollow and deleteExpert
+
+### Schema Fields (Builder-specific)
+
+**brainlifts table:**
+- `purposeWhatLearning`, `purposeWhyMatters`, `purposeWhatAbleToDo` — Phase 1 structured prompts
+- `buildPhase` — Current build phase (default: 1)
+
+**experts table:**
+- `who`, `focus`, `why`, `where` — Builder expert detail fields
+- `draftStatus` — `'draft'` | `'complete'`
+
+### API Endpoints (Builder)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/brainlifts/create-blank` | Create empty builder brainlift |
+| PATCH | `/api/brainlifts/:slug/purpose` | Update purpose fields |
+| POST | `/api/brainlifts/:slug/purpose/synthesize` | AI-synthesize purpose statement |
+| POST | `/api/brainlifts/:slug/experts` | Create single expert |
+| PATCH | `/api/brainlifts/:slug/experts/:id` | Update expert fields |
