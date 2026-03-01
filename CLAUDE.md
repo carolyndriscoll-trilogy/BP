@@ -129,22 +129,24 @@ Deploying code that expects schema changes before the DB has them = broken prod.
    docker exec -i wizardly_kalam psql -U postgres -d dok1grader_local < migrations/XXXX_migration_file.sql
    ```
 3. Develop and test against the local DB
-4. **Only when ready to deploy to prod**, apply to Neon:
-   - Use `mcp__Neon__prepare_database_migration` (creates temp branch, tests migration)
-   - Verify with `mcp__Neon__describe_table_schema`
-   - Apply with `mcp__Neon__complete_database_migration`
+4. **Only when ready to deploy to prod**, apply to Railway Postgres:
+   ```bash
+   docker exec -i wizardly_kalam psql "$RAILWAY_DATABASE_URL" -f - < migrations/XXXX_migration_file.sql
+   ```
 5. Then merge/push to main
-
-**⚠️ NEVER use Neon MCP tools during development. Neon is for PRODUCTION only.**
 
 **Local dev config:**
 - Docker container: `wizardly_kalam`
 - Database: `dok1grader_local`
 - User: `postgres`
 
-**Neon prod config:**
-- Project: `dok1grader` (ID: `restless-pine-13558418`)
-- Database: `neondb`
+**Production config (Railway Postgres):**
+- Host: `shortline.proxy.rlwy.net:37725`
+- Database: `railway`
+- Apply migrations via Docker psql:
+  ```bash
+  docker exec -i wizardly_kalam psql "$RAILWAY_DATABASE_URL" -f - < migrations/XXXX_migration_file.sql
+  ```
 - Migrations dir: `migrations/`
 
 ### Authentication & Authorization
