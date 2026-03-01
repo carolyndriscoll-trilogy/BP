@@ -3,15 +3,16 @@ import { useSearch } from 'wouter';
 import type { BrainliftData } from '@shared/schema';
 import { PurposePhase } from './PurposePhase';
 import { ExpertsPhase } from './ExpertsPhase';
+import { KnowledgeTreePhase } from './KnowledgeTreePhase';
 import { PlaceholderPhase } from './PlaceholderPhase';
 
 const PHASES = [
-  { id: 1, label: 'You & Your Purpose' },
+  { id: 1, label: 'You & Your Mission' },
   { id: 2, label: 'Your Experts' },
-  { id: 3, label: 'Your Sources' },
-  { id: 4, label: 'Your Facts' },
-  { id: 5, label: 'Your Summaries' },
-  { id: 6, label: 'Your Insights' },
+  { id: 3, label: 'Knowledge Tree' },
+  { id: 4, label: 'Connections' },
+  { id: 5, label: 'Blueprints' },
+  { id: 6, label: 'Your Stance' },
 ] as const;
 
 interface BuilderViewProps {
@@ -74,7 +75,10 @@ export function BuilderView({ data, slug }: BuilderViewProps) {
         {activePhase === 2 && (
           <ExpertsPhase data={data} slug={slug} />
         )}
-        {activePhase >= 3 && (
+        {activePhase === 3 && (
+          <KnowledgeTreePhase data={data} slug={slug} />
+        )}
+        {activePhase >= 4 && (
           <PlaceholderPhase
             label={PHASES.find(p => p.id === activePhase)?.label || ''}
           />

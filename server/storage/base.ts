@@ -14,6 +14,10 @@ export type {
   ImportAgentConversation, InsertImportAgentConversation,
   BrainliftSource, InsertBrainliftSource,
   ImportPhase, ImportStatus, SourceStatus,
+  BuilderCategory, InsertBuilderCategory,
+  BuilderSource, InsertBuilderSource,
+  BuilderFact, InsertBuilderFact,
+  BuilderSummary, InsertBuilderSummary,
 } from "@shared/schema";
 
 export {
@@ -24,6 +28,7 @@ export {
   dok3Insights, dok3InsightLinks,
   dok4Submissions, dok4Dok3Links, dok4Dok2Links, dok4CoeModelScores,
   importAgentConversations, brainliftSources,
+  builderCategories, builderSources, builderFacts, builderSummaries,
 } from "@shared/schema";
 
 export { eq, inArray, desc, and, sql, isNull, or } from "drizzle-orm";

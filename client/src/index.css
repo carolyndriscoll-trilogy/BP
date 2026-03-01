@@ -151,6 +151,10 @@
   --chart-4: 38 92% 50%;
   --chart-5: 199 89% 48%;
 
+  /* DOK layer colors */
+  --dok1-blue: #3A5BA0;
+  --dok2-green: #2D6A4F;
+
   --font-sans: 'Inter', 'Helvetica Neue', Arial, sans-serif;
   --font-serif: 'Libre Baskerville', Baskerville, 'Baskerville Old Face', Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -339,6 +343,10 @@
   --chart-3: 142 71% 45%;
   --chart-4: 38 92% 50%;
   --chart-5: 199 89% 48%;
+
+  /* DOK layer colors (dark mode) */
+  --dok1-blue: #5B7FBF;
+  --dok2-green: #4A9E75;
 
   --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
