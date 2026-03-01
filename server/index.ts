@@ -130,12 +130,7 @@ httpServer.listen(
 
 (async () => {
   try {
-    // Seed production database if empty
-    try {
-      await seedProductionIfEmpty();
-    } catch (error) {
-      log(`[Seed] Failed: ${error}`, 'server');
-    }
+    // Auto-seeding disabled for production
 
     await registerRoutes(httpServer, app);
 
