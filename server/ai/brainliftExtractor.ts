@@ -4,8 +4,8 @@ import OpenAI from 'openai';
 import type { HierarchyNode, DOK2SummaryGroup, DOK3ExtractedInsight } from '@shared/hierarchy-types';
 import { extractAllFromHierarchy, convertToExtractorFormat, extractPurposeFromHierarchy } from './hierarchyExtractor';
 
-// Feature flag for hierarchy-based extraction
-const USE_HIERARCHY_EXTRACTION = process.env.USE_HIERARCHY_EXTRACTION === 'true';
+// Hierarchy-based extraction is always enabled when hierarchy data is available
+const USE_HIERARCHY_EXTRACTION = true;
 
 let _openai: OpenAI | null = null;
 function getOpenAI(): OpenAI {
