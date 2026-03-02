@@ -174,7 +174,7 @@ function FactsSection({
 
   return (
     <div className="border-l-2 border-l-dok1 pl-3 py-2 space-y-2">
-      <span className="text-[11px] uppercase tracking-wider font-semibold text-dok1">Facts</span>
+      <span className="text-[11px] uppercase tracking-wider font-semibold text-dok1">Facts (DOK1)</span>
       {facts.length === 0 && !newFactText && (
         <p className="text-xs text-muted-foreground/60 italic m-0">
           No facts yet. Add key facts from this source.
