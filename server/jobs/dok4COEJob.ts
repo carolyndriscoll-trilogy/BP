@@ -66,17 +66,21 @@ export async function dok4COEJob(
       qualityEvaluatorModel: submission.qualityEvaluatorModel ?? '',
     });
 
-    // Save individual model scores
+    // Save individual model scores (defensive: one failed save shouldn't kill the job)
     for (const modelResult of coeResult.modelResults) {
-      await storage.saveDOK4COEModelScore(submissionId, {
-        model: modelResult.model,
-        modelFamily: modelResult.modelFamily,
-        axisScores: modelResult.axisScores,
-        ownershipAssessment: modelResult.ownershipAssessment || null,
-        feedback: modelResult.feedback || null,
-        status: modelResult.status,
-        error: modelResult.error,
-      });
+      try {
+        await storage.saveDOK4COEModelScore(submissionId, {
+          model: modelResult.model,
+          modelFamily: modelResult.modelFamily,
+          axisScores: modelResult.axisScores ?? {},
+          ownershipAssessment: modelResult.ownershipAssessment || null,
+          feedback: modelResult.feedback || null,
+          status: modelResult.status,
+          error: modelResult.error,
+        });
+      } catch (saveErr: any) {
+        helpers.logger.error(`[DOK4 COE] Failed to save model score for ${modelResult.model}:`, { err: saveErr });
+      }
     }
 
     // Save aggregate COE result
