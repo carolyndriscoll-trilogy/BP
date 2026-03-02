@@ -59,10 +59,10 @@ export function BuilderView({ data, slug }: BuilderViewProps) {
                   }`}
                 >
                   <span className="text-[11px] font-bold w-5 text-center shrink-0">{phase.id}</span>
-                  <span className="flex-1">
-                    {phase.label}
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate">{phase.label}</span>
                     {phase.dok && (
-                      <span className="text-[10px] text-muted-foreground/60 ml-1 font-normal">({phase.dok})</span>
+                      <span className="block text-[10px] text-muted-foreground/60 font-normal leading-tight">{phase.dok}</span>
                     )}
                   </span>
                 </button>
