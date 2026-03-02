@@ -512,7 +512,7 @@ export async function evaluateCognitiveOwnership(
           return {
             model,
             modelFamily: family,
-            axisScores: null,
+            axisScores: {},
             totalScore: 0,
             ownershipAssessment: '',
             feedback: '',
