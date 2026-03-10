@@ -29,6 +29,7 @@ import { DOK3LinkingUI } from '@/components/DOK3LinkingUI';
 import { LearningStreamTab } from '@/components/LearningStreamTab';
 import { SavedItemsPage, GradedItemsPage } from '@/components/learning-stream';
 import { BuilderView } from '@/components/builder/BuilderView';
+import { BuilderShell } from '@/components/builder/BuilderShell';
 import { usePDFExport } from '@/hooks/usePDFExport';
 import { useShareToken } from '@/hooks/useShareToken';
 import { useDOK3Insights } from '@/hooks/useDOK3Insights';
@@ -89,7 +90,6 @@ export default function Dashboard({ slug, isSharedView = false }: DashboardProps
       params.set('mode', 'build');
     } else {
       params.delete('mode');
-      params.delete('phase');
     }
     const newSearch = params.toString();
     const newUrl = newSearch ? `?${newSearch}` : window.location.pathname;
@@ -258,6 +258,22 @@ const { downloadBrainliftPDF } = usePDFExport();
   );
 
   const { facts, contradictionClusters } = data;
+  const showFullScreenBuilder = viewMode === 'build' && data.sourceType === 'builder' && canModify && !isSharedView;
+
+  if (showFullScreenBuilder) {
+    return (
+      <BuilderShell
+        data={data}
+        slug={slug}
+        onPreview={() => setViewMode('view')}
+        editingAuthor={editingAuthor}
+        setEditingAuthor={setEditingAuthor}
+        authorInput={authorInput}
+        setAuthorInput={setAuthorInput}
+        onUpdateAuthor={handleUpdateAuthor}
+      />
+    );
+  }
 
   return (
     <SidebarLayout

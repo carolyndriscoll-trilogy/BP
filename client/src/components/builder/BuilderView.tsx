@@ -6,7 +6,7 @@ import { ExpertsPhase } from './ExpertsPhase';
 import { KnowledgeTreePhase } from './KnowledgeTreePhase';
 import { PlaceholderPhase } from './PlaceholderPhase';
 
-const PHASES = [
+export const BUILDER_PHASES = [
   { id: 1, label: 'You & Your Mission', dok: null },
   { id: 2, label: 'Your Experts', dok: null },
   { id: 3, label: 'Knowledge Tree', dok: 'DOK1 + DOK2' },
@@ -18,18 +18,27 @@ const PHASES = [
 interface BuilderViewProps {
   data: BrainliftData;
   slug: string;
+  activePhase?: number;
+  onPhaseChange?: (phase: number) => void;
+  showPhaseSidebar?: boolean;
 }
 
-export function BuilderView({ data, slug }: BuilderViewProps) {
+export function BuilderView({
+  data,
+  slug,
+  activePhase: activePhaseProp,
+  onPhaseChange,
+  showPhaseSidebar = true,
+}: BuilderViewProps) {
   const searchString = useSearch();
 
-  const activePhase = useMemo(() => {
+  const activePhaseFromUrl = useMemo(() => {
     const params = new URLSearchParams(searchString);
     const phase = parseInt(params.get('phase') || '1', 10);
     return phase >= 1 && phase <= 6 ? phase : 1;
   }, [searchString]);
 
-  const setActivePhase = useCallback((phase: number) => {
+  const setActivePhaseFromUrl = useCallback((phase: number) => {
     const params = new URLSearchParams(window.location.search);
     params.set('phase', String(phase));
     params.set('mode', 'build');
@@ -38,54 +47,51 @@ export function BuilderView({ data, slug }: BuilderViewProps) {
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, []);
 
-  return (
-    <div className="flex gap-6 min-h-[600px]">
-      {/* Phase sidebar */}
-      <nav className="w-56 shrink-0">
-        <div className="text-[11px] uppercase tracking-[0.15em] font-semibold text-muted-foreground mb-3 px-3">
-          Build Phases
-        </div>
-        <ul className="list-none p-0 m-0 flex flex-col gap-0.5">
-          {PHASES.map((phase) => {
-            const isActive = activePhase === phase.id;
-            return (
-              <li key={phase.id}>
-                <button
-                  onClick={() => setActivePhase(phase.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors border-none cursor-pointer flex items-center gap-2 ${
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                  }`}
-                >
-                  <span className="text-[11px] font-bold w-5 text-center shrink-0">{phase.id}</span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block truncate">{phase.label}</span>
-                    {phase.dok && (
-                      <span className="block text-[10px] text-muted-foreground/60 font-normal leading-tight">{phase.dok}</span>
-                    )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+  const activePhase = activePhaseProp ?? activePhaseFromUrl;
+  const setActivePhase = onPhaseChange ?? setActivePhaseFromUrl;
 
-      {/* Phase content */}
+  return (
+    <div className={`min-h-[600px] ${showPhaseSidebar ? 'flex gap-6' : ''}`}>
+      {showPhaseSidebar && (
+        <nav className="w-56 shrink-0">
+          <div className="text-[11px] uppercase tracking-[0.15em] font-semibold text-muted-foreground mb-3 px-3">
+            Build Phases
+          </div>
+          <ul className="list-none p-0 m-0 flex flex-col gap-0.5">
+            {BUILDER_PHASES.map((phase) => {
+              const isActive = activePhase === phase.id;
+              return (
+                <li key={phase.id}>
+                  <button
+                    onClick={() => setActivePhase(phase.id)}
+                    className={`w-full text-left px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors border-none cursor-pointer flex items-center gap-2 ${
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold w-5 text-center shrink-0">{phase.id}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate">{phase.label}</span>
+                      {phase.dok && (
+                        <span className="block text-[10px] text-muted-foreground/60 font-normal leading-tight">{phase.dok}</span>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
+
       <div className="flex-1 min-w-0">
-        {activePhase === 1 && (
-          <PurposePhase data={data} slug={slug} />
-        )}
-        {activePhase === 2 && (
-          <ExpertsPhase data={data} slug={slug} />
-        )}
-        {activePhase === 3 && (
-          <KnowledgeTreePhase data={data} slug={slug} />
-        )}
+        {activePhase === 1 && <PurposePhase data={data} slug={slug} />}
+        {activePhase === 2 && <ExpertsPhase data={data} slug={slug} />}
+        {activePhase === 3 && <KnowledgeTreePhase data={data} slug={slug} />}
         {activePhase >= 4 && (
           <PlaceholderPhase
-            label={PHASES.find(p => p.id === activePhase)?.label || ''}
+            label={BUILDER_PHASES.find(p => p.id === activePhase)?.label || ''}
           />
         )}
       </div>
