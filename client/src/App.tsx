@@ -8,8 +8,9 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("@/pages/Home"));
+const BrainliftRoute = lazy(() => import("@/pages/BrainliftRoute"));
+const BuilderRoute = lazy(() => import("@/pages/BuilderRoute"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Builder = lazy(() => import("@/pages/Builder"));
 const Login = lazy(() => import("@/pages/Login"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -34,21 +35,21 @@ function Router() {
       <Route path="/brainlifts/:slug">
         {(params) => (
           <ProtectedRoute>
-            <Dashboard slug={params.slug} />
+            <BrainliftRoute slug={params.slug} />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/builder/:slug">
         {(params) => (
           <ProtectedRoute>
-            <Builder slug={params.slug} />
+            <BuilderRoute slug={params.slug} />
           </ProtectedRoute>
         )}
       </Route>
       <Route path="/grading/:slug">
         {(params) => (
           <ProtectedRoute>
-            <Dashboard slug={params.slug} />
+            <BrainliftRoute slug={params.slug} />
           </ProtectedRoute>
         )}
       </Route>
@@ -58,7 +59,7 @@ function Router() {
       <Route path="/:slug">
         {(params) => (
           <ProtectedRoute>
-            <Dashboard slug={params.slug} />
+            <BrainliftRoute slug={params.slug} />
           </ProtectedRoute>
         )}
       </Route>

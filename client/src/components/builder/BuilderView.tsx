@@ -41,7 +41,6 @@ export function BuilderView({
   const setActivePhaseFromUrl = useCallback((phase: number) => {
     const params = new URLSearchParams(window.location.search);
     params.set('phase', String(phase));
-    params.set('mode', 'build');
     const newUrl = `?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
     window.dispatchEvent(new PopStateEvent('popstate'));
